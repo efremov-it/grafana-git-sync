@@ -1,0 +1,202 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-binaries:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Get version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          OUTPUT_NAME="grafana-git-sync-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            OUTPUT_NAME="${OUTPUT_NAME}.exe"
+          fi
+          go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.VERSION }}" \
+            -o "${OUTPUT_NAME}" \
+            cmd/grafana-git-sync/main.go
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: grafana-git-sync-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: grafana-git-sync-*
+
+  build-docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: secrets.DOCKERHUB_USERNAME != ''
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/grafana-git-sync
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-binaries, build-docker]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec mv {} release/ \;
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          # Generate changelog
+          if [ -z "$PREV_TAG" ]; then
+            # First release - use all commits
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            # Generate changelog since previous tag
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --reverse)
+          fi
+          
+          # Extract version from CHANGELOG.md if exists
+          if [ -f CHANGELOG.md ]; then
+            VERSION_NOTES=$(awk '/^## \[.*\].*{GITHUB_REF#refs/tags/}/,/^## \[/{//!p}' CHANGELOG.md | sed '/^## \[/d' | sed '/^$/d')
+            if [ ! -z "$VERSION_NOTES" ]; then
+              CHANGELOG="$VERSION_NOTES"
+            fi
+          fi
+          
+          # Save to file
+          echo "$CHANGELOG" > changelog.txt
+          echo "Generated changelog with $(wc -l < changelog.txt) lines"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: changelog.txt
+          files: release/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update latest tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f latest
+          git push -f origin latest
+
+  update-docs:
+    name: Update Documentation Links
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update version in docs
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          
+          # Update README with latest version
+          sed -i "s/VERSION=\"v[0-9.]*\"/VERSION=\"$VERSION\"/g" docs/deployment/systemd.md
+          
+          # Update CHANGELOG with release link
+          sed -i "s|\[Unreleased\]|[$VERSION] - $(date +%Y-%m-%d)|" CHANGELOG.md
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/deployment/systemd.md CHANGELOG.md
+          git diff --staged --quiet || git commit -m "docs: update version to ${GITHUB_REF#refs/tags/}"
+          git push origin main || echo "No changes to commit"

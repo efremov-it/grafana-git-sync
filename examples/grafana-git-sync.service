@@ -1,0 +1,64 @@
+[Unit]
+Description=Grafana Git Sync - Automatic dashboard synchronization from Git
+Documentation=https://github.com/efremov-it/grafana-git-sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=grafana-git-sync
+Group=grafana-git-sync
+WorkingDirectory=/opt/grafana-git-sync
+
+# Git Configuration
+Environment="GIT_REPO_URL=ssh://git@github.com/your-org/dashboards.git"
+Environment="GIT_BRANCH=main"
+Environment="GIT_LOCAL_REPO_DIR=/var/lib/grafana-git-sync/repo"
+Environment="DASHBOARDS_DIR=/var/lib/grafana-git-sync/dashboards"
+
+# SSH Authentication (use one of these methods)
+# Method 1: SSH Key from file
+EnvironmentFile=-/etc/grafana-git-sync/ssh-key.env
+# Method 2: HTTPS Authentication
+#Environment="GIT_HTTPS_USER=your-username"
+#Environment="GIT_HTTPS_PASS=your-token"
+
+# Optional: Subdirectory support
+#Environment="GIT_REPO_SUBDIR=dashboards/production"
+
+# Grafana Configuration
+Environment="GRAFANA_URL=http://localhost:3000"
+# Method 1: Auto-create token
+Environment="GF_SECURITY_ADMIN_USER=admin"
+EnvironmentFile=-/etc/grafana-git-sync/grafana-password.env
+# Method 2: Use existing token
+#EnvironmentFile=-/etc/grafana-git-sync/grafana-token.env
+
+# Sync Configuration
+Environment="POLL_INTERVAL_SEC=60"
+Environment="HEALTH_CHECK_PORT=8080"
+
+# Run the service
+ExecStart=/usr/local/bin/grafana-git-sync
+
+# Restart policy
+Restart=always
+RestartSec=10s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/grafana-git-sync
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=grafana-git-sync
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,178 @@
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+
+---
+# Secret for SSH key
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-git-sync-ssh
+  namespace: monitoring
+type: Opaque
+stringData:
+  ssh-key: |
+    -----BEGIN OPENSSH PRIVATE KEY-----
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABlwAAAAdzc2gtcn
+    ... (your full SSH private key here) ...
+    -----END OPENSSH PRIVATE KEY-----
+
+---
+# Secret for Grafana admin credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin-creds
+  namespace: monitoring
+type: Opaque
+stringData:
+  username: admin
+  password: admin
+
+---
+# ConfigMap for non-sensitive configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-git-sync-config
+  namespace: monitoring
+data:
+  GIT_REPO_URL: "ssh://git@github.com/your-org/dashboards.git"
+  GIT_BRANCH: "main"
+  GRAFANA_URL: "http://grafana:3000"
+  POLL_INTERVAL_SEC: "60"
+  HEALTH_CHECK_PORT: "8080"
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-git-sync
+  namespace: monitoring
+  labels:
+    app: grafana-git-sync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana-git-sync
+  template:
+    metadata:
+      labels:
+        app: grafana-git-sync
+    spec:
+      containers:
+      - name: grafana-git-sync
+        image: grafana-git-sync:latest
+        imagePullPolicy: IfNotPresent
+        
+        env:
+        # Git configuration
+        - name: GIT_REPO_URL
+          valueFrom:
+            configMapKeyRef:
+              name: grafana-git-sync-config
+              key: GIT_REPO_URL
+        - name: GIT_BRANCH
+          valueFrom:
+            configMapKeyRef:
+              name: grafana-git-sync-config
+              key: GIT_BRANCH
+        - name: GIT_SSH_KEY
+          valueFrom:
+            secretKeyRef:
+              name: grafana-git-sync-ssh
+              key: ssh-key
+        
+        # Grafana configuration
+        - name: GRAFANA_URL
+          valueFrom:
+            configMapKeyRef:
+              name: grafana-git-sync-config
+              key: GRAFANA_URL
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-creds
+              key: username
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-creds
+              key: password
+        
+        # Sync configuration
+        - name: POLL_INTERVAL_SEC
+          valueFrom:
+            configMapKeyRef:
+              name: grafana-git-sync-config
+              key: POLL_INTERVAL_SEC
+        - name: HEALTH_CHECK_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: grafana-git-sync-config
+              key: HEALTH_CHECK_PORT
+        
+        ports:
+        - name: health
+          containerPort: 8080
+          protocol: TCP
+        
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+        
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      
+      restartPolicy: Always
+
+---
+# Service for health checks (optional)
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-git-sync
+  namespace: monitoring
+  labels:
+    app: grafana-git-sync
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: health
+    protocol: TCP
+    name: health
+  selector:
+    app: grafana-git-sync
