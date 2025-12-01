@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Russian translation (README.ru.md)
 - Health check configuration examples
 - Docker and Docker Compose examples
+- Kubernetes deployment manifests and guide
+- Systemd service unit file and deployment guide
+- GitHub Actions automated release workflow
 
 ### Technical
 - Go 1.24

@@ -16,12 +16,12 @@ services:
     image: grafana-git-sync:latest
     container_name: grafana_git_sync
     environment:
-      - GIT_REPO_URL=ssh://git@git.moscow.alfaintra.net/dops/grafana_dashboards.git
+      - GIT_REPO_URL=ssh://git@example.com/grafana_dashboards.git
       - GIT_BRANCH=master
       - GIT_REPO_SUBDIR=dashboards
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GIT_SSH_KEY=-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACANX7mrFHc109yH625IOaYE466SHjXdmnKYHQrc5I7/cgAAAJhh+QsDYfkL\nAwAAAAtzc2gtZWQyNTUxOQAAACANX7mrFHc109yH625IOaYE466SHjXdmnKYHQrc5I7/cg\nAAAEB/xgGUbCxpAMkahCn3yJj3NxJCy5kPwVlUWvyQv2ploA1fuasUdzXT3Ifrbkg5pgTj\nrpIeNd2acpgdCtzkjv9yAAAAEGVmcmVtb3ZAYm9vbHRpbWUBAgMEBQ==\n-----END OPENSSH PRIVATE KEY-----
+      - GIT_SSH_KEY=-----BEGIN OPENSSH PRIVATE KEY-----\nb3Blbn...oA1fuasUdzXT3Ifrbkg5pgTj\nrpIeNd2acpgdCtzkjv9yAAAAEGVmcmVtb3ZAYm9vbHRpbWUBAgMEBQ==\n-----END OPENSSH PRIVATE KEY-----
       - GRAFANA_URL=http://grafana:3000
     ports:
       - "8080:8080"  # Health check endpoint

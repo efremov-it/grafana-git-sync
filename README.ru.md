@@ -121,6 +121,7 @@ GF_SECURITY_TOKEN=glsa_ваш_токен
 - **[Архитектура](docs/architecture.md)** - Как работает система внутри
 - **[Развертывание Docker](docs/deployment/docker.md)** - Docker и Docker Compose
 - **[Развертывание Kubernetes](docs/deployment/kubernetes.md)** - K8s манифесты и Helm
+- **[Развертывание Systemd](docs/deployment/systemd.md)** - Linux systemd сервис
 - **[Устранение неполадок](docs/troubleshooting.md)** - Частые проблемы и решения
 
 ---

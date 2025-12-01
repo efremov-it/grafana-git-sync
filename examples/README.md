@@ -14,6 +14,10 @@ This directory contains working examples for deploying Grafana Git Sync in vario
 
 - **[kubernetes.yaml](kubernetes.yaml)** - Complete K8s deployment with secrets, configmaps, deployment, and service
 
+### Systemd
+
+- **[grafana-git-sync.service](grafana-git-sync.service)** - Systemd service unit file for Linux
+
 ---
 
 ## 🚀 Quick Start
@@ -50,6 +54,57 @@ This directory contains working examples for deploying Grafana Git Sync in vario
    - URL: http://localhost:3000
    - Username: admin
    - Password: admin
+
+---
+
+### Systemd (Linux Service)
+
+1. **Install binary:**
+   ```bash
+   # Download from GitHub releases or build from source
+   sudo cp bin/grafana-git-sync /usr/local/bin/
+   sudo chmod +x /usr/local/bin/grafana-git-sync
+   ```
+
+2. **Copy service file:**
+   ```bash
+   sudo cp grafana-git-sync.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   ```
+
+3. **Configure authentication:**
+   ```bash
+   # Create configuration directory
+   sudo mkdir -p /etc/grafana-git-sync
+   
+   # For SSH: Create SSH key environment file
+   sudo bash -c 'cat > /etc/grafana-git-sync/ssh-key.env << EOF
+   GIT_SSH_KEY="$(cat ~/.ssh/id_rsa)"
+   EOF'
+   
+   # For Grafana: Create password file
+   sudo bash -c 'cat > /etc/grafana-git-sync/grafana-password.env << EOF
+   GF_SECURITY_ADMIN_PASSWORD=your-password
+   EOF'
+   
+   # Secure files
+   sudo chmod 600 /etc/grafana-git-sync/*.env
+   ```
+
+4. **Edit service configuration:**
+   ```bash
+   sudo systemctl edit --full grafana-git-sync.service
+   # Update GIT_REPO_URL, GIT_BRANCH, GRAFANA_URL
+   ```
+
+5. **Start service:**
+   ```bash
+   sudo systemctl enable --now grafana-git-sync
+   sudo systemctl status grafana-git-sync
+   sudo journalctl -u grafana-git-sync -f
+   ```
+
+**Full guide:** [docs/deployment/systemd.md](../docs/deployment/systemd.md)
 
 ---
 
