@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+
+  grafana-git-sync:
+    image: grafana-git-sync:latest
+    container_name: grafana-git-sync
+    depends_on:
+      - grafana
+    ports:
+      - "8080:8080"  # Health check endpoint
+    environment:
+      # Git Configuration (HTTPS)
+      GIT_REPO_URL: https://github.com/your-org/dashboards.git
+      GIT_BRANCH: main
+      GIT_HTTPS_USER: your-username
+      GIT_HTTPS_PASS: ghp_yourGitHubPersonalAccessToken
+      
+      # Optional: Subdirectory in repo containing dashboards
+      # GIT_REPO_SUBDIR: dashboards/production
+      
+      # Grafana Configuration
+      GRAFANA_URL: http://grafana:3000
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      
+      # Sync Configuration
+      POLL_INTERVAL_SEC: 60
+    
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    restart: unless-stopped
+
+volumes:
+  grafana-data:
