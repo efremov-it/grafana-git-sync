@@ -1,35 +1,16 @@
 # Grafana Git Sync
 
-**Git → Sync → Grafana API**
+**Git → Sync → Grafana API.** Автоматическая синхронизация дашбордов из git-репозитория
+в Grafana по API, с real-time обновлением на каждом коммите.
 
-Автоматическая синхронизация дашбордов Grafana из Git-репозитория с обновлением в реальном времени при каждом коммите.
+> 📚 **Полная документация:** [`docs/shared/components/grafana-git-sync/`](docs/shared/components/grafana-git-sync/)
+> (git-submodule из [`vpnmesh/docs`](https://github.com/vpnmesh/docs) — общий источник правды).
 
-[![Go Version](https://img.shields.io/badge/Go-1.24-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
-
-[English](README.md) | **Русский**
-
-## ✨ Ключевые возможности
-
-- **📁 Неограниченная вложенность папок** - Сохраняет полную иерархию директорий из Git
-- **🔄 Непрерывная синхронизация** - Автоматическое обнаружение коммитов и мгновенная синхронизация
-- **📝 Версионирование дашбордов** - Связывает версии Grafana с Git-коммитами (автор, сообщение)
-- **🚀 Умная синхронизация** - Загружает только измененные дашборды
-- **🏥 Health Check** - HTTP endpoint для Docker/Kubernetes проб
-- **🔐 Гибкая аутентификация** - SSH или HTTPS для Git, токены или учетные данные для Grafana
-- **🐳 Stateless** - Без постоянного состояния, дружественен к контейнерам
-
----
-
-## 🚀 Быстрый старт
-
-### Docker Run
+## Быстрый старт
 
 ```bash
 docker run -d \
-  --name grafana-git-sync \
-  -p 8080:8080 \
+  --name grafana-git-sync -p 8080:8080 \
   -e GIT_REPO_URL=ssh://git@github.com/your-org/dashboards.git \
   -e GIT_BRANCH=main \
   -e GIT_SSH_KEY="$(cat ~/.ssh/id_rsa)" \
@@ -39,178 +20,39 @@ docker run -d \
   grafana-git-sync:latest
 ```
 
-### Docker Compose
+Примеры docker-compose / k8s — в [`examples/`](examples/).
 
-```yaml
-version: '3.8'
-
-services:
-  grafana-git-sync:
-    image: grafana-git-sync:latest
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      GIT_REPO_URL: ssh://git@github.com/your-org/dashboards.git
-      GIT_BRANCH: main
-      GIT_SSH_KEY: |
-        -----BEGIN OPENSSH PRIVATE KEY-----
-        ваш_ключ_здесь
-        -----END OPENSSH PRIVATE KEY-----
-      GRAFANA_URL: http://grafana:3000
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
-      POLL_INTERVAL_SEC: 60
-```
-
-**Больше примеров:** [examples/](examples/)
-
----
-
-## 📋 Конфигурация
-
-### Обязательные переменные окружения
-
-| Переменная | Описание |
-|----------|-------------|
-| `GIT_REPO_URL` | URL Git-репозитория (SSH или HTTPS) |
-| `GIT_BRANCH` | Ветка или тег для синхронизации |
-| `GRAFANA_URL` | URL экземпляра Grafana |
-
-### Аутентификация (Git)
-
-**SSH:**
-```bash
-GIT_SSH_KEY="$(cat ~/.ssh/id_rsa)"
-```
-
-**HTTPS:**
-```bash
-GIT_HTTPS_USER=username
-GIT_HTTPS_PASS=token_или_пароль
-```
-
-### Аутентификация (Grafana)
-
-**Автоматическое создание токена:**
-```bash
-GF_SECURITY_ADMIN_USER=admin
-GF_SECURITY_ADMIN_PASSWORD=admin
-```
-
-**Использование существующего токена:**
-```bash
-GF_SECURITY_TOKEN=glsa_ваш_токен
-```
-
-### Дополнительные настройки
-
-| Переменная | По умолчанию | Описание |
-|----------|---------|-------------|
-| `POLL_INTERVAL_SEC` | `60` | Интервал опроса Git |
-| `GIT_REPO_SUBDIR` | `.` | Поддиректория с дашбордами |
-| `HEALTH_CHECK_PORT` | `8080` | Порт health endpoint |
-
-**Полная справка по конфигурации:** [docs/configuration.md](docs/configuration.md)
-
----
-
-## 📚 Документация
-
-- **[Руководство по конфигурации](docs/configuration.md)** - Все переменные окружения с примерами
-- **[Архитектура](docs/architecture.md)** - Как работает система внутри
-- **[Развертывание Docker](docs/deployment/docker.md)** - Docker и Docker Compose
-- **[Развертывание Kubernetes](docs/deployment/kubernetes.md)** - K8s манифесты и Helm
-- **[Развертывание Systemd](docs/deployment/systemd.md)** - Linux systemd сервис
-- **[Устранение неполадок](docs/troubleshooting.md)** - Частые проблемы и решения
-
----
-
-## 🔧 Как это работает
-
-1. **Клонирование Git** - Загружает JSON файлы дашбордов
-2. **Построение структуры папок** - Преобразует директории Git в папки Grafana
-3. **Загрузка дашбордов** - Синхронизирует с Grafana с метаданными версий
-4. **Опрос изменений** - Проверяет Git каждые N секунд
-5. **Умная синхронизация** - Загружает только измененные дашборды
-
-**Детали архитектуры:** [docs/architecture.md](docs/architecture.md)
-
----
-
-## 🎯 Почему использовать это?
-
-**Ни одно другое OSS решение не предлагает:**
-- ✅ Синхронизация через API (без provisioning и рестартов Grafana)
-- ✅ Обновления в реальном времени на Git коммиты
-- ✅ Неограниченная вложенность папок
-- ✅ Версионирование дашбордов с привязкой к Git
-- ✅ Kubernetes-native (stateless, health checks)
-- ✅ Нулевая конфигурация файлов (только env vars)
-
-**Идеально для:**
-- GitOps workflow
-- Управление дашбордами для нескольких окружений
-- Командная работа с Git-ревью
-- Disaster recovery (Git как источник правды)
-
----
-
-## 🛠 Сборка из исходников
+## Сборка
 
 ```bash
-git clone https://github.com/efremov-it/grafana-git-sync.git
-cd grafana-git-sync
-
-# Сборка бинарника
-make build
-
-# Сборка Docker образа
-make docker-build
-
-# Запуск
-./bin/grafana-git-sync
+make build          # бинарник в bin/
+make docker-build   # Docker-образ
+make test           # тесты
 ```
 
----
+## Документация
 
-## 🗺 Дорожная карта
+| Что нужно | Где смотреть |
+|---|---|
+| Все переменные окружения | [`docs/shared/components/grafana-git-sync/docs/configuration.md`](docs/shared/components/grafana-git-sync/docs/configuration.md) |
+| Как устроено внутри | [`docs/shared/components/grafana-git-sync/docs/architecture.md`](docs/shared/components/grafana-git-sync/docs/architecture.md) |
+| Деплой (Docker / K8s / systemd) | [`docs/shared/components/grafana-git-sync/docs/deployment/`](docs/shared/components/grafana-git-sync/docs/deployment/) |
+| Траблшутинг | [`docs/shared/components/grafana-git-sync/docs/troubleshooting.md`](docs/shared/components/grafana-git-sync/docs/troubleshooting.md) |
 
-- [x] Версионирование дашбордов (v0.1.0)
-- [x] Health check endpoint (v0.1.0)
-- [x] Умная синхронизация (v0.1.0)
-- [x] Неограниченная вложенность папок (v0.1.0)
-- [ ] Синхронизация удаления дашбордов
-- [ ] Режим Webhook
-- [ ] Метрики Prometheus
-- [ ] Helm chart
+Не забудь подтянуть submodule:
 
----
+```bash
+git submodule update --init --recursive
+# или сразу при клонировании:
+git clone --recurse-submodules <repo-url>
+```
 
-## 📝 Лицензия
+## Контрибьютинг
 
-MIT License - см. [LICENSE](LICENSE)
+См. [`CONTRIBUTING.md`](CONTRIBUTING.md). Если меняешь публичный контракт (CLI, env-переменные,
+API, поведение sync) — обновляй документацию в [`vpnmesh/docs`](https://github.com/vpnmesh/docs)
+**отдельным PR**.
 
----
+## Лицензия
 
-## 🤝 Участие в разработке
-
-Вклад приветствуется! См. [CONTRIBUTING.md](CONTRIBUTING.md)
-
-1. Форкните репозиторий
-2. Создайте ветку функции (`git checkout -b feature/amazing`)
-3. Закоммитьте изменения (`git commit -m 'Add feature'`)
-4. Запушьте в ветку (`git push origin feature/amazing`)
-5. Откройте Pull Request
-
----
-
-## 📧 Поддержка
-
-- 🐛 [GitHub Issues](https://github.com/efremov-it/grafana-git-sync/issues)
-- 💬 [GitHub Discussions](https://github.com/efremov-it/grafana-git-sync/discussions)
-- 📖 [Документация](docs/)
-
----
-
-**Сделано с ❤️ для сообщества Grafana**
+[MIT](LICENSE)

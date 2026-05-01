@@ -1,0 +1,4 @@
+[submodule "docs/shared"]
+	path = docs/shared
+	url = git@github.com:vpnmesh/docs.git
+	branch = main

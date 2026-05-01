@@ -1,0 +1,56 @@
+name: Update vpnmesh/docs submodule
+
+# Daily PR to bump docs/shared to latest vpnmesh/docs main.
+# Authored by GitHub Actions bot; review and merge as you would any PR.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Bump docs/shared to latest
+        id: bump
+        run: |
+          cd docs/shared
+          OLD=$(git rev-parse HEAD)
+          git fetch origin main
+          git checkout origin/main
+          NEW=$(git rev-parse HEAD)
+          cd ../..
+          if [ "$OLD" = "$NEW" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Submodule already at latest ($NEW)"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "old=$OLD" >> "$GITHUB_OUTPUT"
+            echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create pull request
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/bump-docs-submodule
+          delete-branch: true
+          commit-message: "chore: bump docs/shared submodule"
+          title: "chore: bump vpnmesh/docs submodule"
+          body: |
+            Automatic daily bump of `docs/shared` submodule.
+
+            - Old: `${{ steps.bump.outputs.old }}`
+            - New: `${{ steps.bump.outputs.new }}`
+
+            Diff: https://github.com/vpnmesh/docs/compare/${{ steps.bump.outputs.old }}...${{ steps.bump.outputs.new }}
+          labels: docs, automated
