@@ -5,7 +5,7 @@ name: Update vpnmesh/docs submodule
 
 on:
   schedule:
-    - cron: '0 6 * * *'   # 06:00 UTC daily
+    - cron: "0 6 * * *" # 06:00 UTC daily
   workflow_dispatch:
 
 permissions:
